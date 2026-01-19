@@ -1,0 +1,8 @@
+services:
+  flowable:
+    container_name: flowable
+    image: flowable/flowable-ui
+    ports:
+      - 8080:8080
+    volumes:
+      - ./flowable-db:/home/flowable/flowable-db/
