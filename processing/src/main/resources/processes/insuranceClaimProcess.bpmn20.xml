@@ -9,83 +9,147 @@
              expressionLanguage="http://www.w3.org/1999/XPath"
              targetNamespace="http://www.flowable.org/processdef">
 
+    <!-- 
+    =====================================================
+    INSURANCE CLAIM PROCESSING WORKFLOW
+    =====================================================
+    
+    Participants (conceptually represented):
+    - Customer: Initiates claim, receives notifications
+    - Insurance System: Main processing (this process)  
+    - Payment Partner: External payment processing
+    
+    Gates used:
+    - XOR (Exclusive Gateway): For decision points
+    - AND (Parallel Gateway): For parallel execution
+    - OR (Inclusive Gateway): For conditional parallel paths
+    
+    Services:
+    - REST: Identity, Eligibility, Compensation, Notification
+    - SOAP: Policy Validation
+    - gRPC: Fraud Detection
+    - GraphQL: Claim Tracking (external)
+    =====================================================
+    -->
+
     <process id="insuranceClaimProcess" name="Insurance Claim Processing" isExecutable="true">
         
-        <!-- Start Event -->
-        <startEvent id="startEvent" name="Claim Submitted"/>
+        <!-- ===== START EVENT ===== -->
+        <startEvent id="startEvent" name="Claim Submitted by Customer">
+            <documentation>Customer initiates insurance claim (Message from Customer Pool)</documentation>
+        </startEvent>
         
-        <!-- Identity Verification -->
+        <!-- ===== IDENTITY VERIFICATION (REST) ===== -->
         <sequenceFlow id="flow1" sourceRef="startEvent" targetRef="verifyIdentity"/>
         
-        <serviceTask id="verifyIdentity" name="Verify Customer Identity"
+        <serviceTask id="verifyIdentity" name="Verify Customer Identity (REST)"
                      flowable:delegateExpression="${identityVerificationDelegate}">
-            <documentation>Verify customer identity using internal checks</documentation>
+            <documentation>Verify customer identity using REST API</documentation>
         </serviceTask>
         
-        <!-- Identity Check Gateway -->
+        <!-- XOR GATEWAY: Identity Decision -->
         <sequenceFlow id="flow2" sourceRef="verifyIdentity" targetRef="identityGateway"/>
         
-        <exclusiveGateway id="identityGateway" name="Identity Verified?"/>
+        <exclusiveGateway id="identityGateway" name="Identity Verified?">
+            <documentation>XOR Gateway - Exclusive decision based on identity verification result</documentation>
+        </exclusiveGateway>
         
         <sequenceFlow id="flowIdentityFailed" sourceRef="identityGateway" targetRef="rejectClaim">
             <conditionExpression xsi:type="tFormalExpression">${!identityVerified}</conditionExpression>
         </sequenceFlow>
         
-        <sequenceFlow id="flowIdentityPassed" sourceRef="identityGateway" targetRef="validatePolicy">
+        <sequenceFlow id="flowIdentityPassed" sourceRef="identityGateway" targetRef="parallelValidationSplit">
             <conditionExpression xsi:type="tFormalExpression">${identityVerified}</conditionExpression>
         </sequenceFlow>
+
+        <!-- ===== AND GATEWAY: PARALLEL VALIDATION ===== -->
+        <!-- Policy validation (SOAP) and Fraud detection (gRPC) run in PARALLEL -->
+        <parallelGateway id="parallelValidationSplit" name="Start Parallel Validation (AND Split)">
+            <documentation>AND Gateway - Execute Policy Validation and Fraud Detection in parallel</documentation>
+        </parallelGateway>
         
-        <!-- Policy Validation (SOAP) -->
+        <sequenceFlow id="flowToPolicy" sourceRef="parallelValidationSplit" targetRef="validatePolicy"/>
+        <sequenceFlow id="flowToFraud" sourceRef="parallelValidationSplit" targetRef="detectFraud"/>
+        
+        <!-- Policy Validation via SOAP (Call to external partner) -->
         <serviceTask id="validatePolicy" name="Validate Policy (SOAP)"
                      flowable:delegateExpression="${policyValidationDelegate}">
-            <documentation>Validate policy via SOAP service</documentation>
+            <documentation>Validate insurance policy via SOAP service - simulates call to external Policy System</documentation>
         </serviceTask>
         
-        <!-- Policy Check Gateway -->
-        <sequenceFlow id="flow3" sourceRef="validatePolicy" targetRef="policyGateway"/>
-        
-        <exclusiveGateway id="policyGateway" name="Policy Valid?"/>
-        
-        <sequenceFlow id="flowPolicyInvalid" sourceRef="policyGateway" targetRef="rejectClaim">
-            <conditionExpression xsi:type="tFormalExpression">${!policyValid}</conditionExpression>
-        </sequenceFlow>
-        
-        <sequenceFlow id="flowPolicyValid" sourceRef="policyGateway" targetRef="detectFraud">
-            <conditionExpression xsi:type="tFormalExpression">${policyValid}</conditionExpression>
-        </sequenceFlow>
-        
-        <!-- Fraud Detection (gRPC) -->
+        <!-- Fraud Detection via gRPC -->
         <serviceTask id="detectFraud" name="Detect Fraud (gRPC)"
                      flowable:delegateExpression="${fraudDetectionDelegate}">
-            <documentation>Check fraud risk via gRPC service</documentation>
+            <documentation>Analyze fraud risk via gRPC service</documentation>
         </serviceTask>
         
-        <!-- Fraud Check Gateway -->
-        <sequenceFlow id="flow4" sourceRef="detectFraud" targetRef="fraudGateway"/>
+        <!-- AND Gateway JOIN: Wait for both parallel paths -->
+        <sequenceFlow id="flowFromPolicy" sourceRef="validatePolicy" targetRef="parallelValidationJoin"/>
+        <sequenceFlow id="flowFromFraud" sourceRef="detectFraud" targetRef="parallelValidationJoin"/>
         
-        <exclusiveGateway id="fraudGateway" name="Fraud Risk Level?"/>
+        <parallelGateway id="parallelValidationJoin" name="End Parallel Validation (AND Join)">
+            <documentation>AND Gateway - Wait for both Policy Validation and Fraud Detection to complete</documentation>
+        </parallelGateway>
         
-        <sequenceFlow id="flowHighFraud" sourceRef="fraudGateway" targetRef="rejectClaim">
-            <conditionExpression xsi:type="tFormalExpression">${fraudRiskLevel == 'HIGH'}</conditionExpression>
+        <!-- XOR GATEWAY: Check validation results -->
+        <sequenceFlow id="flow3" sourceRef="parallelValidationJoin" targetRef="validationResultsGateway"/>
+        
+        <exclusiveGateway id="validationResultsGateway" name="Validation Results?">
+            <documentation>XOR Gateway - Route based on combined validation results</documentation>
+        </exclusiveGateway>
+        
+        <sequenceFlow id="flowValidationFailed" sourceRef="validationResultsGateway" targetRef="rejectClaim">
+            <conditionExpression xsi:type="tFormalExpression">${!policyValid || fraudRiskLevel == 'HIGH'}</conditionExpression>
         </sequenceFlow>
         
-        <sequenceFlow id="flowMediumFraud" sourceRef="fraudGateway" targetRef="expertReview">
+        <sequenceFlow id="flowNeedsReview" sourceRef="validationResultsGateway" targetRef="inclusiveReviewSplit">
+            <conditionExpression xsi:type="tFormalExpression">${policyValid &amp;&amp; fraudRiskLevel == 'MEDIUM'}</conditionExpression>
+        </sequenceFlow>
+        
+        <sequenceFlow id="flowAutoApprove" sourceRef="validationResultsGateway" targetRef="calculateEligibility">
+            <conditionExpression xsi:type="tFormalExpression">${policyValid &amp;&amp; fraudRiskLevel == 'LOW'}</conditionExpression>
+        </sequenceFlow>
+
+        <!-- ===== OR GATEWAY: INCLUSIVE REVIEW ===== -->
+        <!-- For medium risk: Can do document review AND/OR expert assessment based on conditions -->
+        <inclusiveGateway id="inclusiveReviewSplit" name="Review Options (OR Split)">
+            <documentation>OR Gateway (Inclusive) - Execute Document Review AND/OR Expert Assessment based on conditions</documentation>
+        </inclusiveGateway>
+        
+        <!-- Document review needed if amount > 5000 -->
+        <sequenceFlow id="flowToDocReview" sourceRef="inclusiveReviewSplit" targetRef="documentReview">
+            <conditionExpression xsi:type="tFormalExpression">${claimedAmount > 5000}</conditionExpression>
+        </sequenceFlow>
+        
+        <!-- Expert assessment always needed for medium risk -->
+        <sequenceFlow id="flowToExpert" sourceRef="inclusiveReviewSplit" targetRef="expertAssessment">
             <conditionExpression xsi:type="tFormalExpression">${fraudRiskLevel == 'MEDIUM'}</conditionExpression>
         </sequenceFlow>
         
-        <sequenceFlow id="flowLowFraud" sourceRef="fraudGateway" targetRef="calculateEligibility">
-            <conditionExpression xsi:type="tFormalExpression">${fraudRiskLevel == 'LOW'}</conditionExpression>
-        </sequenceFlow>
-        
-        <!-- Expert Review (User Task) -->
-        <userTask id="expertReview" name="Expert Review" 
-                  flowable:candidateGroups="experts">
-            <documentation>Manual review by insurance expert</documentation>
+        <userTask id="documentReview" name="Document Review"
+                  flowable:candidateGroups="reviewers">
+            <documentation>Review submitted documents - Manual task by Document Reviewers</documentation>
         </userTask>
         
-        <sequenceFlow id="flow5" sourceRef="expertReview" targetRef="expertDecisionGateway"/>
+        <userTask id="expertAssessment" name="Expert Assessment"
+                  flowable:candidateGroups="experts">
+            <documentation>Expert manual assessment of the claim</documentation>
+        </userTask>
         
-        <exclusiveGateway id="expertDecisionGateway" name="Expert Approved?"/>
+        <!-- OR Gateway JOIN: Wait for completed conditional paths -->
+        <sequenceFlow id="flowFromDocReview" sourceRef="documentReview" targetRef="inclusiveReviewJoin"/>
+        <sequenceFlow id="flowFromExpert" sourceRef="expertAssessment" targetRef="inclusiveReviewJoin"/>
+        
+        <inclusiveGateway id="inclusiveReviewJoin" name="Review Complete (OR Join)">
+            <documentation>OR Gateway (Inclusive) - Wait for all triggered review tasks to complete</documentation>
+        </inclusiveGateway>
+        
+        <!-- XOR Gateway: Expert Decision -->
+        <sequenceFlow id="flow4" sourceRef="inclusiveReviewJoin" targetRef="expertDecisionGateway"/>
+        
+        <exclusiveGateway id="expertDecisionGateway" name="Expert Approved?">
+            <documentation>XOR Gateway - Route based on expert decision</documentation>
+        </exclusiveGateway>
         
         <sequenceFlow id="flowExpertRejected" sourceRef="expertDecisionGateway" targetRef="rejectClaim">
             <conditionExpression xsi:type="tFormalExpression">${!expertApproved}</conditionExpression>
@@ -94,17 +158,19 @@
         <sequenceFlow id="flowExpertApproved" sourceRef="expertDecisionGateway" targetRef="calculateEligibility">
             <conditionExpression xsi:type="tFormalExpression">${expertApproved}</conditionExpression>
         </sequenceFlow>
-        
-        <!-- Calculate Eligibility (uses existing eligibilityDelegate) -->
-        <serviceTask id="calculateEligibility" name="Calculate Eligibility"
+
+        <!-- ===== ELIGIBILITY CALCULATION (REST) ===== -->
+        <serviceTask id="calculateEligibility" name="Calculate Eligibility (REST)"
                      flowable:delegateExpression="${eligibilityDelegate}">
-            <documentation>Calculate claim eligibility and approved amount</documentation>
+            <documentation>Calculate claim eligibility using REST API</documentation>
         </serviceTask>
         
-        <!-- Eligibility Gateway -->
-        <sequenceFlow id="flow6" sourceRef="calculateEligibility" targetRef="eligibilityGateway"/>
+        <!-- XOR Gateway: Eligibility Check -->
+        <sequenceFlow id="flow5" sourceRef="calculateEligibility" targetRef="eligibilityGateway"/>
         
-        <exclusiveGateway id="eligibilityGateway" name="Eligible?"/>
+        <exclusiveGateway id="eligibilityGateway" name="Eligible?">
+            <documentation>XOR Gateway - Route based on eligibility result</documentation>
+        </exclusiveGateway>
         
         <sequenceFlow id="flowNotEligible" sourceRef="eligibilityGateway" targetRef="rejectClaim">
             <conditionExpression xsi:type="tFormalExpression">${!eligible}</conditionExpression>
@@ -113,25 +179,27 @@
         <sequenceFlow id="flowEligible" sourceRef="eligibilityGateway" targetRef="requestPayment">
             <conditionExpression xsi:type="tFormalExpression">${eligible}</conditionExpression>
         </sequenceFlow>
-        
-        <!-- Request Payment -->
+
+        <!-- ===== PAYMENT REQUEST (to Payment Partner Pool) ===== -->
         <serviceTask id="requestPayment" name="Request Payment"
                      flowable:delegateExpression="${paymentRequestDelegate}">
-            <documentation>Send payment request to payment partner</documentation>
+            <documentation>Send payment request to Payment Partner (external pool)</documentation>
         </serviceTask>
         
-        <sequenceFlow id="flow7" sourceRef="requestPayment" targetRef="processPayment"/>
+        <sequenceFlow id="flow6" sourceRef="requestPayment" targetRef="processPayment"/>
         
-        <!-- Process Payment (using existing paymentProcessingDelegate) -->
-        <serviceTask id="processPayment" name="Process Payment"
+        <!-- Process Payment (simulates Payment Partner response) -->
+        <serviceTask id="processPayment" name="Process Payment Response"
                      flowable:delegateExpression="${paymentProcessingDelegate}">
-            <documentation>Process the payment</documentation>
+            <documentation>Process payment response from Payment Partner</documentation>
         </serviceTask>
         
-        <!-- Payment Gateway -->
-        <sequenceFlow id="flow8" sourceRef="processPayment" targetRef="paymentGateway"/>
+        <!-- XOR Gateway: Payment Result -->
+        <sequenceFlow id="flow7" sourceRef="processPayment" targetRef="paymentGateway"/>
         
-        <exclusiveGateway id="paymentGateway" name="Payment Authorized?"/>
+        <exclusiveGateway id="paymentGateway" name="Payment Authorized?">
+            <documentation>XOR Gateway - Route based on payment authorization result from Payment Partner</documentation>
+        </exclusiveGateway>
         
         <sequenceFlow id="flowPaymentFailed" sourceRef="paymentGateway" targetRef="rejectClaim">
             <conditionExpression xsi:type="tFormalExpression">${!paymentAuthorized}</conditionExpression>
@@ -140,27 +208,40 @@
         <sequenceFlow id="flowPaymentSuccess" sourceRef="paymentGateway" targetRef="sendCompensation">
             <conditionExpression xsi:type="tFormalExpression">${paymentAuthorized}</conditionExpression>
         </sequenceFlow>
-        
-        <!-- Send Compensation/Notification -->
+
+        <!-- ===== COMPENSATION (REST) ===== -->
         <serviceTask id="sendCompensation" name="Send Compensation"
                      flowable:delegateExpression="${compensationDelegate}">
-            <documentation>Send compensation and approval notification</documentation>
+            <documentation>Process compensation payment via REST</documentation>
         </serviceTask>
         
-        <sequenceFlow id="flow9" sourceRef="sendCompensation" targetRef="endApproved"/>
+        <sequenceFlow id="flow8" sourceRef="sendCompensation" targetRef="notifyApproval"/>
         
-        <!-- Reject Claim (Notification) -->
-        <serviceTask id="rejectClaim" name="Reject Claim Notification"
+        <!-- ===== NOTIFICATION TO CUSTOMER ===== -->
+        <serviceTask id="notifyApproval" name="Notify Customer (Approved)"
                      flowable:delegateExpression="${notificationDelegate}">
-            <documentation>Reject claim and notify customer</documentation>
+            <documentation>Send approval notification to Customer (message to Customer Pool)</documentation>
+        </serviceTask>
+        
+        <sequenceFlow id="flow9" sourceRef="notifyApproval" targetRef="endApproved"/>
+
+        <!-- ===== REJECTION HANDLING ===== -->
+        <serviceTask id="rejectClaim" name="Notify Customer (Rejected)"
+                     flowable:delegateExpression="${notificationDelegate}">
+            <documentation>Send rejection notification to Customer (message to Customer Pool)</documentation>
         </serviceTask>
         
         <sequenceFlow id="flow10" sourceRef="rejectClaim" targetRef="endRejected"/>
+
+        <!-- ===== END EVENTS ===== -->
+        <endEvent id="endApproved" name="Claim Approved">
+            <documentation>Process completed successfully - Claim approved and paid</documentation>
+        </endEvent>
         
-        <!-- End Events -->
-        <endEvent id="endApproved" name="Claim Approved"/>
-        <endEvent id="endRejected" name="Claim Rejected"/>
+        <endEvent id="endRejected" name="Claim Rejected">
+            <documentation>Process completed - Claim rejected at some validation step</documentation>
+        </endEvent>
         
     </process>
-    
+
 </definitions>
