@@ -1,0 +1,29 @@
+# Ignore les fichiers de build et IDE
+target/
+!target/classes/
+*.class
+*.jar
+*.war
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Maven
+.mvn/
+mvnw
+mvnw.cmd
+
+# OS
+.DS_Store
+Thumbs.db
+
+# H2 database files
+*.db
+*.trace.db
+*.lock.db

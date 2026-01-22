@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  insurance-claim-processing:
+    build: .
+    container_name: insurance-claim-app
+    ports:
+      - "8081:8081"   # REST/SOAP/GraphQL
+      - "9090:9090"   # gRPC
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - JAVA_OPTS=-Xmx512m
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
