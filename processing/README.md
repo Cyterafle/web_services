@@ -41,11 +41,24 @@ processing/
 
 ## Lancement
 
+### Avec Docker
+
 ```bash
 cd processing
-./mvnw spring-boot:run
+docker-compose up --build
 ```
-ou
+
+> **Prérequis Docker** : Avoir Docker et Docker Compose installés.
+> 
+> **Avantage** : Pas besoin d'installer Java ou Maven sur la machine !
+
+### Arrêter l'application
+
+- Maven : `Ctrl+C`
+- Docker : `Ctrl+C` ou `docker-compose down`
+
+### pour Avec développement avec Maven
+
 ```bash
 cd processing
 mvn spring-boot:run
