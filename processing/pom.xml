@@ -113,6 +113,20 @@
 			<artifactId>spring-graphql-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		
+		<!-- Flowable Spring Boot Starter -->
+		<dependency>
+			<groupId>org.flowable</groupId>
+			<artifactId>flowable-spring-boot-starter</artifactId>
+			<version>7.0.1</version>
+		</dependency>
+
+		<!-- Flowable REST API -->
+		<dependency>
+			<groupId>org.flowable</groupId>
+			<artifactId>flowable-spring-boot-starter-rest</artifactId>
+			<version>7.0.1</version>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -174,7 +188,6 @@
 					<clearOutputDir>false</clearOutputDir>
 				</configuration>
 			</plugin>
-			
 			<!-- Protobuf pour gRPC -->
 			<plugin>
 				<groupId>org.xolstice.maven.plugins</groupId>

@@ -22,13 +22,20 @@ processing/
 │   ├── rest/controller/     # Controllers REST
 │   ├── soap/                # Service SOAP
 │   ├── grpc/                # Service gRPC
-│   └── graphql/             # Controller GraphQL
+│   ├── graphql/             # Controller GraphQL
+│   └── flowable/            # Workflow Flowable
+│       ├── WorkflowController.java
+│       ├── WorkflowService.java
+│       ├── FlowableConfig.java
+│       └── delegates/       # Service Tasks delegates
 ├── src/main/resources/
 │   ├── application.properties
 │   ├── data.sql             # Données de test
 │   ├── xsd/                 # Schémas XSD pour SOAP
 │   ├── graphql/             # Schémas GraphQL
-│   └── proto/               # Fichiers .proto pour gRPC
+│   ├── proto/               # Fichiers .proto pour gRPC
+│   └── processes/           # Fichiers BPMN Flowable
+│       └── insuranceClaimProcess.bpmn20.xml
 └── pom.xml
 ```
 
@@ -154,6 +161,49 @@ query {
 9. **Payment Authorization** (REST) → Paiement autorisé
 10. **Customer Notification** (REST) → Client notifié
 11. **Claim Tracking** (GraphQL) → Suivi disponible
+
+## Flowable Workflow (BPMN)
+
+Le système intègre **Flowable** pour orchestrer automatiquement le processus de traitement des réclamations.
+
+### Endpoints Flowable
+
+| Méthode | Endpoint | Description |
+|---------|----------|-------------|
+| `POST` | `/api/workflow/start/{claimId}` | Démarrer un workflow |
+| `GET` | `/api/workflow/status/{claimId}` | Obtenir le statut |
+| `GET` | `/api/workflow/variables/{claimId}` | Variables du processus |
+| `GET` | `/api/workflow/tasks/{claimId}` | Tâches actives |
+| `POST` | `/api/workflow/signal-payment/{claimId}` | Signaler réponse paiement |
+| `DELETE` | `/api/workflow/cancel/{claimId}` | Annuler le workflow |
+
+### Démarrer un Workflow
+
+Via cURL :
+```bash
+curl -X POST "http://localhost:8081/api/workflow/start/12345678-1234-1234-1234-123456789012"
+```
+
+Via Swagger UI : http://localhost:8081/swagger-ui.html → Workflow Management
+
+### ClaimIds de Test Disponibles
+
+| ClaimId | Client | Type | Montant |
+|---------|--------|------|---------|
+| `12345678-1234-1234-1234-123456789012` | John Doe | AUTO | 5000€ |
+| `23456789-2345-2345-2345-234567890123` | Jane Smith | HEALTH | 2500€ |
+| `34567890-3456-3456-3456-345678901234` | Pierre Martin | AUTO | 15000€ |
+
+### Vérifier le Statut
+
+```bash
+curl "http://localhost:8081/api/workflow/status/12345678-1234-1234-1234-123456789012"
+```
+
+Ou directement dans le navigateur :
+```
+http://localhost:8081/api/workflow/status/12345678-1234-1234-1234-123456789012
+```
 
 ## Données de Test
 

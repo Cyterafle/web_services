@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             typeLanguage="http://www.w3.org/2001/XMLSchema"
+             expressionLanguage="http://www.w3.org/1999/XPath"
+             targetNamespace="http://www.flowable.org/processdef">
+
+    <process id="insuranceClaimProcess" name="Insurance Claim Processing" isExecutable="true">
+        
+        <!-- Start Event -->
+        <startEvent id="startEvent" name="Claim Submitted"/>
+        
+        <!-- Identity Verification -->
+        <sequenceFlow id="flow1" sourceRef="startEvent" targetRef="verifyIdentity"/>
+        
+        <serviceTask id="verifyIdentity" name="Verify Customer Identity"
+                     flowable:delegateExpression="${identityVerificationDelegate}">
+            <documentation>Verify customer identity using internal checks</documentation>
+        </serviceTask>
+        
+        <!-- Identity Check Gateway -->
+        <sequenceFlow id="flow2" sourceRef="verifyIdentity" targetRef="identityGateway"/>
+        
+        <exclusiveGateway id="identityGateway" name="Identity Verified?"/>
+        
+        <sequenceFlow id="flowIdentityFailed" sourceRef="identityGateway" targetRef="rejectClaim">
+            <conditionExpression xsi:type="tFormalExpression">${!identityVerified}</conditionExpression>
+        </sequenceFlow>
+        
+        <sequenceFlow id="flowIdentityPassed" sourceRef="identityGateway" targetRef="validatePolicy">
+            <conditionExpression xsi:type="tFormalExpression">${identityVerified}</conditionExpression>
+        </sequenceFlow>
+        
+        <!-- Policy Validation (SOAP) -->
+        <serviceTask id="validatePolicy" name="Validate Policy (SOAP)"
+                     flowable:delegateExpression="${policyValidationDelegate}">
+            <documentation>Validate policy via SOAP service</documentation>
+        </serviceTask>
+        
+        <!-- Policy Check Gateway -->
+        <sequenceFlow id="flow3" sourceRef="validatePolicy" targetRef="policyGateway"/>
+        
+        <exclusiveGateway id="policyGateway" name="Policy Valid?"/>
+        
+        <sequenceFlow id="flowPolicyInvalid" sourceRef="policyGateway" targetRef="rejectClaim">
+            <conditionExpression xsi:type="tFormalExpression">${!policyValid}</conditionExpression>
+        </sequenceFlow>
+        
+        <sequenceFlow id="flowPolicyValid" sourceRef="policyGateway" targetRef="detectFraud">
+            <conditionExpression xsi:type="tFormalExpression">${policyValid}</conditionExpression>
+        </sequenceFlow>
+        
+        <!-- Fraud Detection (gRPC) -->
+        <serviceTask id="detectFraud" name="Detect Fraud (gRPC)"
+                     flowable:delegateExpression="${fraudDetectionDelegate}">
+            <documentation>Check fraud risk via gRPC service</documentation>
+        </serviceTask>
+        
+        <!-- Fraud Check Gateway -->
+        <sequenceFlow id="flow4" sourceRef="detectFraud" targetRef="fraudGateway"/>
+        
+        <exclusiveGateway id="fraudGateway" name="Fraud Risk Level?"/>
+        
+        <sequenceFlow id="flowHighFraud" sourceRef="fraudGateway" targetRef="rejectClaim">
+            <conditionExpression xsi:type="tFormalExpression">${fraudRiskLevel == 'HIGH'}</conditionExpression>
+        </sequenceFlow>
+        
+        <sequenceFlow id="flowMediumFraud" sourceRef="fraudGateway" targetRef="expertReview">
+            <conditionExpression xsi:type="tFormalExpression">${fraudRiskLevel == 'MEDIUM'}</conditionExpression>
+        </sequenceFlow>
+        
+        <sequenceFlow id="flowLowFraud" sourceRef="fraudGateway" targetRef="calculateEligibility">
+            <conditionExpression xsi:type="tFormalExpression">${fraudRiskLevel == 'LOW'}</conditionExpression>
+        </sequenceFlow>
+        
+        <!-- Expert Review (User Task) -->
+        <userTask id="expertReview" name="Expert Review" 
+                  flowable:candidateGroups="experts">
+            <documentation>Manual review by insurance expert</documentation>
+        </userTask>
+        
+        <sequenceFlow id="flow5" sourceRef="expertReview" targetRef="expertDecisionGateway"/>
+        
+        <exclusiveGateway id="expertDecisionGateway" name="Expert Approved?"/>
+        
+        <sequenceFlow id="flowExpertRejected" sourceRef="expertDecisionGateway" targetRef="rejectClaim">
+            <conditionExpression xsi:type="tFormalExpression">${!expertApproved}</conditionExpression>
+        </sequenceFlow>
+        
+        <sequenceFlow id="flowExpertApproved" sourceRef="expertDecisionGateway" targetRef="calculateEligibility">
+            <conditionExpression xsi:type="tFormalExpression">${expertApproved}</conditionExpression>
+        </sequenceFlow>
+        
+        <!-- Calculate Eligibility (uses existing eligibilityDelegate) -->
+        <serviceTask id="calculateEligibility" name="Calculate Eligibility"
+                     flowable:delegateExpression="${eligibilityDelegate}">
+            <documentation>Calculate claim eligibility and approved amount</documentation>
+        </serviceTask>
+        
+        <!-- Eligibility Gateway -->
+        <sequenceFlow id="flow6" sourceRef="calculateEligibility" targetRef="eligibilityGateway"/>
+        
+        <exclusiveGateway id="eligibilityGateway" name="Eligible?"/>
+        
+        <sequenceFlow id="flowNotEligible" sourceRef="eligibilityGateway" targetRef="rejectClaim">
+            <conditionExpression xsi:type="tFormalExpression">${!eligible}</conditionExpression>
+        </sequenceFlow>
+        
+        <sequenceFlow id="flowEligible" sourceRef="eligibilityGateway" targetRef="requestPayment">
+            <conditionExpression xsi:type="tFormalExpression">${eligible}</conditionExpression>
+        </sequenceFlow>
+        
+        <!-- Request Payment -->
+        <serviceTask id="requestPayment" name="Request Payment"
+                     flowable:delegateExpression="${paymentRequestDelegate}">
+            <documentation>Send payment request to payment partner</documentation>
+        </serviceTask>
+        
+        <sequenceFlow id="flow7" sourceRef="requestPayment" targetRef="processPayment"/>
+        
+        <!-- Process Payment (using existing paymentProcessingDelegate) -->
+        <serviceTask id="processPayment" name="Process Payment"
+                     flowable:delegateExpression="${paymentProcessingDelegate}">
+            <documentation>Process the payment</documentation>
+        </serviceTask>
+        
+        <!-- Payment Gateway -->
+        <sequenceFlow id="flow8" sourceRef="processPayment" targetRef="paymentGateway"/>
+        
+        <exclusiveGateway id="paymentGateway" name="Payment Authorized?"/>
+        
+        <sequenceFlow id="flowPaymentFailed" sourceRef="paymentGateway" targetRef="rejectClaim">
+            <conditionExpression xsi:type="tFormalExpression">${!paymentAuthorized}</conditionExpression>
+        </sequenceFlow>
+        
+        <sequenceFlow id="flowPaymentSuccess" sourceRef="paymentGateway" targetRef="sendCompensation">
+            <conditionExpression xsi:type="tFormalExpression">${paymentAuthorized}</conditionExpression>
+        </sequenceFlow>
+        
+        <!-- Send Compensation/Notification -->
+        <serviceTask id="sendCompensation" name="Send Compensation"
+                     flowable:delegateExpression="${compensationDelegate}">
+            <documentation>Send compensation and approval notification</documentation>
+        </serviceTask>
+        
+        <sequenceFlow id="flow9" sourceRef="sendCompensation" targetRef="endApproved"/>
+        
+        <!-- Reject Claim (Notification) -->
+        <serviceTask id="rejectClaim" name="Reject Claim Notification"
+                     flowable:delegateExpression="${notificationDelegate}">
+            <documentation>Reject claim and notify customer</documentation>
+        </serviceTask>
+        
+        <sequenceFlow id="flow10" sourceRef="rejectClaim" targetRef="endRejected"/>
+        
+        <!-- End Events -->
+        <endEvent id="endApproved" name="Claim Approved"/>
+        <endEvent id="endRejected" name="Claim Rejected"/>
+        
+    </process>
+    
+</definitions>
