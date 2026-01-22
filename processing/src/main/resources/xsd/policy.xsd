@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="http://cyterafle.com/claim/soap/policy"
+           targetNamespace="http://cyterafle.com/claim/soap/policy"
+           elementFormDefault="qualified">
+
+    <!-- Request pour valider une police -->
+    <xs:element name="validatePolicyRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="policyNumber" type="xs:string"/>
+                <xs:element name="customerId" type="xs:string"/>
+                <xs:element name="claimType" type="xs:string"/>
+                <xs:element name="claimedAmount" type="xs:double"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Response de validation -->
+    <xs:element name="validatePolicyResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="valid" type="xs:boolean"/>
+                <xs:element name="policyId" type="xs:string" minOccurs="0"/>
+                <xs:element name="policyType" type="xs:string" minOccurs="0"/>
+                <xs:element name="coverageAmount" type="xs:double" minOccurs="0"/>
+                <xs:element name="message" type="xs:string"/>
+                <xs:element name="errorCode" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Request pour obtenir les détails d'une police -->
+    <xs:element name="getPolicyDetailsRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="policyNumber" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Response avec les détails de la police -->
+    <xs:element name="getPolicyDetailsResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="found" type="xs:boolean"/>
+                <xs:element name="policy" type="tns:policyInfo" minOccurs="0"/>
+                <xs:element name="message" type="xs:string"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- Type complexe pour les informations de police -->
+    <xs:complexType name="policyInfo">
+        <xs:sequence>
+            <xs:element name="policyId" type="xs:string"/>
+            <xs:element name="policyNumber" type="xs:string"/>
+            <xs:element name="customerId" type="xs:string"/>
+            <xs:element name="type" type="xs:string"/>
+            <xs:element name="coverageAmount" type="xs:double"/>
+            <xs:element name="startDate" type="xs:date"/>
+            <xs:element name="endDate" type="xs:date"/>
+            <xs:element name="active" type="xs:boolean"/>
+        </xs:sequence>
+    </xs:complexType>
+
+</xs:schema>

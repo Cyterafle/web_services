@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.cyterafle.salahsama.claim.processing.grpc.generated";
+option java_outer_classname = "FraudDetectionProto";
+
+package fraud;
+
+// Service de détection de fraude
+service FraudDetectionService {
+  // Analyse une réclamation pour détecter la fraude
+  rpc AnalyzeClaim(FraudAnalysisRequest) returns (FraudAnalysisResponse);
+  
+  // Obtient le score de risque d'un client
+  rpc GetCustomerRiskScore(CustomerRiskRequest) returns (CustomerRiskResponse);
+}
+
+// Requête d'analyse de fraude
+message FraudAnalysisRequest {
+  string claim_id = 1;
+  string customer_id = 2;
+  string policy_number = 3;
+  string claim_type = 4;
+  double claimed_amount = 5;
+  string description = 6;
+  int32 claims_last_year = 7;  // Nombre de réclamations dans l'année
+}
+
+// Réponse d'analyse de fraude
+message FraudAnalysisResponse {
+  string claim_id = 1;
+  RiskLevel risk_level = 2;
+  double risk_score = 3;  // Score de 0 à 100
+  repeated string risk_factors = 4;  // Facteurs de risque identifiés
+  string recommendation = 5;
+  bool requires_manual_review = 6;
+}
+
+// Niveaux de risque
+enum RiskLevel {
+  UNKNOWN = 0;
+  LOW = 1;
+  MEDIUM = 2;
+  HIGH = 3;
+}
+
+// Requête pour le score de risque client
+message CustomerRiskRequest {
+  string customer_id = 1;
+}
+
+// Réponse avec le score de risque client
+message CustomerRiskResponse {
+  string customer_id = 1;
+  double risk_score = 2;
+  int32 total_claims = 3;
+  int32 rejected_claims = 4;
+  int32 approved_claims = 5;
+  string risk_category = 6;
+}

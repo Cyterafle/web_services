@@ -1,0 +1,108 @@
+type Query {
+    # Récupérer une réclamation par ID
+    claim(id: ID!): Claim
+
+    # Récupérer toutes les réclamations d'un client
+    claimsByCustomer(customerId: ID!): [Claim!]!
+
+    # Récupérer les réclamations par statut
+    claimsByStatus(status: ClaimStatus!): [Claim!]!
+
+    # Récupérer l'historique d'une réclamation
+    claimHistory(claimId: ID!): [ClaimHistoryEntry!]!
+
+    # Récupérer toutes les réclamations (avec pagination optionnelle)
+    allClaims(page: Int, size: Int): ClaimPage!
+}
+
+type Mutation {
+    # Mettre à jour le statut d'une réclamation
+    updateClaimStatus(claimId: ID!, newStatus: ClaimStatus!, comment: String): Claim
+}
+
+type Claim {
+    id: ID!
+    customer: Customer
+    policy: Policy
+    policyNumber: String!
+    claimType: String!
+    claimedAmount: Float!
+    description: String
+    status: ClaimStatus!
+    fraudRiskLevel: String
+    approvedAmount: Float
+    expertDecision: String
+    expertComments: String
+    createdAt: String
+    updatedAt: String
+    history: [ClaimHistoryEntry!]!
+}
+
+type Customer {
+    id: ID!
+    name: String!
+    surname: String!
+    mail: String!
+    phone: String
+    address: String
+    verified: Boolean
+}
+
+type Policy {
+    id: ID!
+    policyNumber: String!
+    type: PolicyType!
+    coverageAmount: Float!
+    startDate: String
+    endDate: String
+    active: Boolean!
+}
+
+type ClaimHistoryEntry {
+    id: ID!
+    previousStatus: ClaimStatus
+    newStatus: ClaimStatus!
+    action: String!
+    details: String
+    performedBy: String
+    timestamp: String!
+}
+
+type ClaimPage {
+    content: [Claim!]!
+    totalElements: Int!
+    totalPages: Int!
+    currentPage: Int!
+}
+
+enum ClaimStatus {
+    SUBMITTED
+    IDENTITY_VERIFIED
+    IDENTITY_FAILED
+    POLICY_VALIDATED
+    POLICY_INVALID
+    FRAUD_CHECK_LOW
+    FRAUD_CHECK_MEDIUM
+    FRAUD_CHECK_HIGH
+    ELIGIBLE
+    REJECTED_BY_RULES
+    DOCUMENTS_REQUESTED
+    DOCUMENTS_RECEIVED
+    DOCUMENTS_INVALID
+    EXPERT_REVIEW
+    APPROVED
+    REJECTED
+    COMPENSATION_CALCULATED
+    PAYMENT_AUTHORIZED
+    PAYMENT_FAILED
+    COMPLETED
+    SUSPENDED
+}
+
+enum PolicyType {
+    AUTO
+    HOME
+    HEALTH
+    LIFE
+    TRAVEL
+}
