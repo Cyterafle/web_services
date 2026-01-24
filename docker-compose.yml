@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   insurance-claim-processing:
-    build: .
+    build: processing
     container_name: insurance-claim-app
     ports:
       - "8081:8081"   # REST/SOAP/GraphQL

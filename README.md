@@ -23,45 +23,21 @@ processing/
 │   ├── soap/                # Service SOAP
 │   ├── grpc/                # Service gRPC
 │   ├── graphql/             # Controller GraphQL
-│   └── flowable/            # Workflow Flowable
-│       ├── WorkflowController.java
-│       ├── WorkflowService.java
-│       ├── FlowableConfig.java
-│       └── delegates/       # Service Tasks delegates
+│   └── orchestration/       # WebSocket pour suivre le workflow
 ├── src/main/resources/
 │   ├── application.properties
 │   ├── data.sql             # Données de test
 │   ├── xsd/                 # Schémas XSD pour SOAP
 │   ├── graphql/             # Schémas GraphQL
-│   ├── proto/               # Fichiers .proto pour gRPC
-│   └── processes/           # Fichiers BPMN Flowable
-│       └── insuranceClaimProcess.bpmn20.xml
+│   └── proto/               # Fichiers .proto pour gRPC
 └── pom.xml
 ```
 
 ## Lancement
 
-### Avec Docker
-
 ```bash
 cd processing
-docker-compose up --build
-```
-
-> **Prérequis Docker** : Avoir Docker et Docker Compose installés.
-> 
-> **Avantage** : Pas besoin d'installer Java ou Maven sur la machine !
-
-### Arrêter l'application
-
-- Maven : `Ctrl+C`
-- Docker : `Ctrl+C` ou `docker-compose down`
-
-### pour Avec développement avec Maven
-
-```bash
-cd processing
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
 Ou sous Windows :
@@ -175,49 +151,6 @@ query {
 10. **Customer Notification** (REST) → Client notifié
 11. **Claim Tracking** (GraphQL) → Suivi disponible
 
-## Flowable Workflow (BPMN)
-
-Le système intègre **Flowable** pour orchestrer automatiquement le processus de traitement des réclamations.
-
-### Endpoints Flowable
-
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| `POST` | `/api/workflow/start/{claimId}` | Démarrer un workflow |
-| `GET` | `/api/workflow/status/{claimId}` | Obtenir le statut |
-| `GET` | `/api/workflow/variables/{claimId}` | Variables du processus |
-| `GET` | `/api/workflow/tasks/{claimId}` | Tâches actives |
-| `POST` | `/api/workflow/signal-payment/{claimId}` | Signaler réponse paiement |
-| `DELETE` | `/api/workflow/cancel/{claimId}` | Annuler le workflow |
-
-### Démarrer un Workflow
-
-Via cURL :
-```bash
-curl -X POST "http://localhost:8081/api/workflow/start/12345678-1234-1234-1234-123456789012"
-```
-
-Via Swagger UI : http://localhost:8081/swagger-ui.html → Workflow Management
-
-### ClaimIds de Test Disponibles
-
-| ClaimId | Client | Type | Montant |
-|---------|--------|------|---------|
-| `12345678-1234-1234-1234-123456789012` | John Doe | AUTO | 5000€ |
-| `23456789-2345-2345-2345-234567890123` | Jane Smith | HEALTH | 2500€ |
-| `34567890-3456-3456-3456-345678901234` | Pierre Martin | AUTO | 15000€ |
-
-### Vérifier le Statut
-
-```bash
-curl "http://localhost:8081/api/workflow/status/12345678-1234-1234-1234-123456789012"
-```
-
-Ou directement dans le navigateur :
-```
-http://localhost:8081/api/workflow/status/12345678-1234-1234-1234-123456789012
-```
-
 ## Données de Test
 
 ### Clients
@@ -237,81 +170,3 @@ http://localhost:8081/api/workflow/status/12345678-1234-1234-1234-123456789012
 - JDBC URL: `jdbc:h2:mem:claimdb`
 - User: `sa`
 - Password: `password`
-
-## Architecture BPMN
-
-### Pools (Participants)
-
-| Pool | Description | Rôle |
-|------|-------------|------|
-| **Customer** | Client de l'assurance | Soumet la réclamation, reçoit les notifications |
-| **Insurance System** | Système de traitement | Traitement automatisé et manuel |
-| **Payment Partner** | Partenaire de paiement externe | Traite les paiements |
-
-### Lanes (dans Insurance System)
-
-| Lane | Description |
-|------|-------------|
-| **Automated Processing** | Tasks automatiques (REST, SOAP, gRPC) |
-| **Expert Review** | Tasks manuelles (User Tasks) |
-
-### Gateways
-
-| Type | Nom | Description |
-|------|-----|-------------|
-| **XOR (Exclusive)** | `identityGateway` | Identité vérifiée ? |
-| **XOR (Exclusive)** | `validationResultsGateway` | Résultats validation ? |
-| **XOR (Exclusive)** | `expertDecisionGateway` | Expert approuve ? |
-| **XOR (Exclusive)** | `eligibilityGateway` | Éligible ? |
-| **XOR (Exclusive)** | `paymentGateway` | Paiement autorisé ? |
-| **AND (Parallel)** | `parallelValidationSplit/Join` | Policy + Fraud en parallèle |
-| **OR (Inclusive)** | `inclusiveReviewSplit/Join` | Document Review ET/OU Expert Assessment |
-
-### Message Flows
-
-```
-Customer → Insurance System : Claim Submission
-Insurance System → Payment Partner : Payment Request
-Payment Partner → Insurance System : Payment Response
-Insurance System → Customer : Notification
-```
-
-## Tests
-
-### Lancer les tests
-
-```bash
-cd processing
-mvn test
-```
-
-### Tests disponibles
-
-| Fichier | Type | Description |
-|---------|------|-------------|
-| `RestControllerIntegrationTest.java` | Integration | Tests REST Controllers |
-| `SoapServiceTest.java` | Integration | Tests SOAP Service |
-| `GraphQLServiceTest.java` | Integration | Tests GraphQL Queries |
-| `RepositoryUnitTest.java` | Unit | Tests Repositories/Entities |
-| `FlowableWorkflowTest.java` | Integration | Tests Workflow BPMN |
-
-### Couverture des tests
-
-- ✅ REST API endpoints
-- ✅ SOAP Policy Validation
-- ✅ GraphQL Queries
-- ✅ Repositories (JPA)
-- ✅ Flowable Workflow
-- ✅ Swagger/OpenAPI
-
-## Documentation des APIs
-
-| API | Documentation | URL |
-|-----|---------------|-----|
-| REST | Swagger/OpenAPI | http://localhost:8081/swagger-ui.html |
-| REST | OpenAPI JSON | http://localhost:8081/api-docs |
-| SOAP | WSDL | http://localhost:8081/ws/policies.wsdl |
-| SOAP | XSD Schema | `src/main/resources/xsd/policy.xsd` |
-| gRPC | Proto File | `src/main/proto/fraud_detection.proto` |
-| GraphQL | Schema | `src/main/resources/graphql/schema.graphqls` |
-| GraphQL | GraphiQL UI | http://localhost:8081/graphiql |
