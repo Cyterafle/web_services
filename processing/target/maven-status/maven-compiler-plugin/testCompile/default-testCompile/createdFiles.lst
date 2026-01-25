@@ -1,5 +1,5 @@
-com/cyterafle/salahsama/claim/processing/SoapServiceTest.class
 com/cyterafle/salahsama/claim/processing/FlowableWorkflowTest.class
+com/cyterafle/salahsama/claim/processing/SoapServiceTest.class
 com/cyterafle/salahsama/claim/processing/RestControllerIntegrationTest.class
 com/cyterafle/salahsama/claim/processing/RepositoryUnitTest.class
 com/cyterafle/salahsama/claim/processing/GraphQLServiceTest.class
