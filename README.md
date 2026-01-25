@@ -8,9 +8,9 @@ Système de traitement de réclamations d'assurance de bout en bout utilisant di
 - **GraphQL** : Suivi des réclamations (Claim Tracking)
 
 ## Prérequis
-- Java 17+
+- Java 17
 - Maven 3.8+
-- (Optionnel) Docker pour Flowable UI
+- NodeJS
 
 ## Structure du Projet
 
@@ -31,6 +31,7 @@ processing/
 │   ├── graphql/             # Schémas GraphQL
 │   └── proto/               # Fichiers .proto pour gRPC
 └── pom.xml
+webapp/ => Front en ReactJS
 ```
 
 ## Lancement
@@ -38,17 +39,23 @@ processing/
 ```bash
 cd processing
 ./mvnw spring-boot:run
+cd ../webapp
+npm install && npm start
 ```
 
 Ou sous Windows :
 ```bash
+cd processing
 mvnw.cmd spring-boot:run
+cd ..\webapp
+npm install && npm start
 ```
 
 ## URLs Disponibles
 
 | Service | URL | Description |
 |---------|-----|-------------|
+| Interface | http://localhost:3000 | Front en ReactJS pour l'exécution des endpoints |
 | Swagger UI | http://localhost:8081/swagger-ui.html | Documentation REST |
 | GraphiQL | http://localhost:8081/graphiql | Interface GraphQL |
 | H2 Console | http://localhost:8081/h2-console | Base de données |
